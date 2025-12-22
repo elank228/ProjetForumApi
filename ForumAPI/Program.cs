@@ -16,6 +16,9 @@ using ForumApi.Middlewares;
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 
+
+
+
 // Locale
 builder.Services.AddLocalization(options => { options.ResourcesPath = "Resources"; });
 builder.Services.Configure<RequestLocalizationOptions>(
@@ -133,6 +136,8 @@ app.UseRequestLocalization(localizeOptions.Value);
 app.UseRouting();
 
 app.UseAuth();
+app.UseAuthorization();
+
 
 app.UseMiddleware<LoadUserInfosMiddleware>();
 app.UseMiddleware<ApplicationExceptionMiddleware>();
@@ -141,5 +146,11 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
 });
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    await IdentitySeed.SeedRolesAsync(services);
+}
 
 app.Run();

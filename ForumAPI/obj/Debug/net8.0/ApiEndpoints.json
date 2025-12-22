@@ -1,6 +1,22 @@
 [
   {
     "ContainingType": "ForumAPI.Controllers.AuthController",
+    "Method": "AssignRole",
+    "RelativePath": "api/auth/assign-role",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "ForumAPI.DTO.AssignRoleDto",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ForumAPI.Controllers.AuthController",
     "Method": "Login",
     "RelativePath": "api/auth/login",
     "HttpMethod": "POST",
@@ -35,6 +51,16 @@
     "ContainingType": "ForumAPI.Controllers.AuthController",
     "Method": "Secure",
     "RelativePath": "api/auth/secure",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ForumAPI.Controllers.AuthController",
+    "Method": "WhoAmI",
+    "RelativePath": "api/auth/whoami",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,

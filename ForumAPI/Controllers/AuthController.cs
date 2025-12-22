@@ -1,5 +1,6 @@
 ﻿using ForumAPI.DTO;
 using ForumAPI.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -15,10 +16,12 @@ namespace ForumAPI.Controllers
     {
         private readonly UserManager<User> _userManager;
         private readonly IConfiguration _config;
+        private readonly RoleManager<Role> _roleManager;
 
-        public AuthController(UserManager<User> userManager, IConfiguration config)
+        public AuthController(UserManager<User> userManager, RoleManager<Role> roleManager, IConfiguration config)
         {
             _userManager = userManager;
+            _roleManager = roleManager;
             _config = config;
         }
 
@@ -32,13 +35,15 @@ namespace ForumAPI.Controllers
                 Email = dto.Email,
                 FirstName = dto.FirstName,
                 LastName = dto.LastName
-
             };
 
             var result = await _userManager.CreateAsync(user, dto.Password);
 
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
+
+            // ✅ Assigner le rôle par défaut "User"
+            await _userManager.AddToRoleAsync(user, "User");
 
             return Ok("Utilisateur créé avec succès");
         }
@@ -53,15 +58,22 @@ namespace ForumAPI.Controllers
                 return Unauthorized("Identifiants invalides");
 
             var claims = new List<Claim>
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+        new Claim(JwtRegisteredClaimNames.Email, user.Email),
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Name, user.UserName)
+    };
+
+            // ✅ AJOUT DES RÔLES
+            var roles = await _userManager.GetRolesAsync(user);
+            foreach (var role in roles)
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.UserName)
-            };
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
 
             var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(_config["Jwt:Key"])
+                Encoding.UTF8.GetBytes(_config["Jwt:Secret"])
             );
 
             var token = new JwtSecurityToken(
@@ -78,6 +90,7 @@ namespace ForumAPI.Controllers
             });
         }
 
+
         // ✅ ROUTE TEST SÉCURISÉE
         [HttpGet("secure")]
         [Microsoft.AspNetCore.Authorization.Authorize]
@@ -86,5 +99,46 @@ namespace ForumAPI.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return Ok($"Accès autorisé ✅ Utilisateur ID : {userId}");
         }
+
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("assign-role")]
+        public async Task<IActionResult> AssignRole([FromBody] AssignRoleDto dto)
+        {
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user == null)
+                return NotFound("Utilisateur non trouvé");
+
+            // Vérifie si le rôle existe
+            var roleExists = await _roleManager.RoleExistsAsync(dto.Role);
+            if (!roleExists)
+                return BadRequest("Le rôle n'existe pas");
+
+            // Retire tous les rôles actuels (optionnel)
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            await _userManager.RemoveFromRolesAsync(user, currentRoles);
+
+            // Assigne le nouveau rôle
+            await _userManager.AddToRoleAsync(user, dto.Role);
+
+            return Ok($"Le rôle {dto.Role} a été attribué à {user.Email}");
+        }
+
+
+        [Authorize]
+        [HttpGet("whoami")]
+        public IActionResult WhoAmI()
+        {
+            return Ok(new
+            {
+                User.Identity.Name,
+                Roles = User.Claims
+                    .Where(c => c.Type == ClaimTypes.Role)
+                    .Select(c => c.Value)
+            });
+        }
+
     }
-}
+      
+
+    }
